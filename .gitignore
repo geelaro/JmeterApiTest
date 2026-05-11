@@ -1,0 +1,29 @@
+# JMeter logs
+jmeter.log
+*.log
+
+# Test results (generated)
+results/
+report/
+
+# Build properties (contains local paths)
+build.properties
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Java compiled classes
+*.class
+
+# OS files
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# JMeter backup files
+*.jmx.bak
