@@ -1,11 +1,11 @@
-# ApiTest — JMeter 自动化性能测试项目
+# JmeterApiTest — JMeter 自动化性能测试项目
 
 基于 Apache JMeter + Ant 的接口自动化测试框架，支持 JDBC 数据库测试和 HTTP API 测试。
 
 ## 项目结构
 
 ```
-ApiTest/
+JmeterApiTest/
 ├── build.xml                    # Ant 构建脚本
 ├── build.properties.sample      # 构建配置模板 → 复制为 build.properties
 ├── jmx/
