@@ -5,15 +5,13 @@ on:
     branches: [main, master]
     paths:
       - 'jmx/**'
-      - 'build.xml'
-      - 'build.properties.sample'
+      - 'run.sh'
       - '.github/workflows/jmeter-test.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'jmx/**'
-      - 'build.xml'
-      - 'build.properties.sample'
+      - 'run.sh'
   workflow_dispatch:
     inputs:
       threads:
@@ -41,7 +39,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/apache-jmeter
-          key: jmeter-5.6.3
+          key: jmeter-5.6.3-v2
 
       - name: Download JMeter
         if: steps.cache-jmeter.outputs.cache-hit != 'true'
@@ -51,70 +49,52 @@ jobs:
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
 
-      - name: Install Ant
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ant
-
-      - name: Create build.properties
-        run: |
-          cat > build.properties << 'EOF'
-          jmeter.home=/opt/apache-jmeter
-          EOF
-
       - name: Run HTTP API tests
+        env:
+          JMETER_HOME: /opt/apache-jmeter
         run: |
-          ant -Djmx.file=HttpApiTest.jmx \
-              -Dthreads=${{ github.event.inputs.threads || 10 }} \
-              -Dloops=${{ github.event.inputs.loops || 1 }} \
-              run
+          bash run.sh HttpApiTest.jmx \
+            ${{ github.event.inputs.threads || 10 }} \
+            ${{ github.event.inputs.loops || 1 }}
 
       - name: Generate job summary
         if: always()
         run: |
-          echo "## JMeter HTTP Test Results :rocket:" >> $GITHUB_STEP_SUMMARY
+          CSV=$(find results -name "result.csv" 2>/dev/null | head -1)
+          echo "## JMeter HTTP Test :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-
-          JTL=$(ls results/**/*.jtl 2>/dev/null | head -1)
-          if [ -n "$JTL" ] && [ -s "$JTL" ]; then
-            # 提取 JTL 中的汇总数据 (xml 格式)
-            SAMPLES=$(grep -oP '(?<=<httpSample).*?(?=/>)' "$JTL" | wc -l || echo "0")
-            FAILURES=$(grep -oP '(?<=<httpSample).*?s="false".*?(?=/>)' "$JTL" | wc -l || echo "0")
-            AVG_TIME=$(grep -oP '(?<=t=")[0-9]+' "$JTL" | awk '{sum+=$1; count++} END {printf "%d", sum/count}' || echo "0")
-
-            echo "| Total Samples | ${SAMPLES} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Failures | ${FAILURES} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Avg Response (ms) | ${AVG_TIME} |" >> $GITHUB_STEP_SUMMARY
-
-            if [ "${FAILURES}" -gt 0 ]; then
+          if [ -n "$CSV" ] && [ -s "$CSV" ]; then
+            LINES=$(tail -n +2 "$CSV" | wc -l)
+            FAILED=$(grep -c ",false," "$CSV" 2>/dev/null || echo 0)
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Samples | ${LINES} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failures | ${FAILED} |" >> $GITHUB_STEP_SUMMARY
+            if [ "${FAILED}" -gt 0 ]; then
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo ":x: **${FAILURES} 个请求失败**" >> $GITHUB_STEP_SUMMARY
+              echo ":x: **${FAILED} 个请求失败**" >> $GITHUB_STEP_SUMMARY
             else
               echo "" >> $GITHUB_STEP_SUMMARY
               echo ":white_check_mark: **全部通过**" >> $GITHUB_STEP_SUMMARY
             fi
           else
-            echo "| Status | No results found |" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | No results |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          # 链接到 HTML 报告 artifact
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> :arrow_down: 完整 HTML 报告见下方 **Artifacts**" >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload HTML report
+      - name: Upload Dashboard
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: http-test-report
-          path: results/**/*.html
+          name: http-test-dashboard
+          path: results/**/dashboard/**
           retention-days: 30
 
-      - name: Upload JTL results
+      - name: Upload CSV results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: http-test-jtl
-          path: results/**/*.jtl
+          name: http-test-csv
+          path: results/**/result.csv
           retention-days: 30
 
   mysql-test:
@@ -132,7 +112,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /opt/apache-jmeter
-          key: jmeter-5.6.3
+          key: jmeter-5.6.3-v2
 
       - name: Download JMeter
         if: steps.cache-jmeter.outputs.cache-hit != 'true'
@@ -142,59 +122,45 @@ jobs:
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
 
-      - name: Install Ant
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ant
-
-      - name: Create build.properties
-        run: |
-          cat > build.properties << 'EOF'
-          jmeter.home=/opt/apache-jmeter
-          EOF
-
       - name: Run MySQL tests
         env:
+          JMETER_HOME: /opt/apache-jmeter
+          DB_URL: ${{ secrets.JMETER_DB_URL }}
+          DB_USERNAME: ${{ secrets.JMETER_DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.JMETER_DB_PASSWORD }}
         run: |
           if [ -z "$DB_PASSWORD" ]; then
             echo "## MySQL Test :pause_button: Skipped" >> $GITHUB_STEP_SUMMARY
-            echo "JMETER_DB_PASSWORD secret 未配置" >> $GITHUB_STEP_SUMMARY
+            echo "JMETER_DB_PASSWORD 未配置" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
-          ant -Djmx.file=MySQLTest.jmx \
-              -Dthreads=${{ github.event.inputs.threads || 10 }} \
-              -Dloops=${{ github.event.inputs.loops || 1 }} \
-              -Ddb.url="${{ secrets.JMETER_DB_URL }}" \
-              -Ddb.username="${{ secrets.JMETER_DB_USERNAME }}" \
-              -Ddb.password="$DB_PASSWORD" \
-              run
+          bash run.sh MySQLTest.jmx \
+            ${{ github.event.inputs.threads || 10 }} \
+            ${{ github.event.inputs.loops || 1 }}
 
       - name: Generate job summary
         if: always()
         run: |
-          JTL=$(ls results/**/*.jtl 2>/dev/null | head -1)
-          if [ -n "$JTL" ] && [ -s "$JTL" ]; then
-            echo "## JMeter MySQL Test Results :bar_chart:" >> $GITHUB_STEP_SUMMARY
+          CSV=$(find results -name "result.csv" 2>/dev/null | head -1)
+          if [ -n "$CSV" ] && [ -s "$CSV" ]; then
+            echo "## JMeter MySQL Test :bar_chart:" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            SAMPLES=$(grep -oP '(?<=<JDBCSampler).*?(?=/>)' "$JTL" | wc -l || echo "0")
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Total JDBC Queries | ${SAMPLES} |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "> :arrow_down: 完整报告见下方 **Artifacts**" >> $GITHUB_STEP_SUMMARY
+            LINES=$(tail -n +2 "$CSV" | wc -l)
+            echo "| Total JDBC Queries | ${LINES} |" >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: Upload HTML report
+      - name: Upload Dashboard
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mysql-test-report
-          path: results/**/*.html
+          name: mysql-test-dashboard
+          path: results/**/dashboard/**
           retention-days: 30
 
-      - name: Upload JTL results
+      - name: Upload CSV results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mysql-test-jtl
-          path: results/**/*.jtl
+          name: mysql-test-csv
+          path: results/**/result.csv
           retention-days: 30

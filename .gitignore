@@ -6,8 +6,8 @@ jmeter.log
 results/
 report/
 
-# Build properties (contains local paths)
-build.properties
+# Local JMeter config (contains local paths)
+jmeter.env
 
 # IDE files
 .idea/
