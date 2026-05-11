@@ -22,7 +22,6 @@ JmeterApiTest/
 | JDK   | 8+      | 推荐 JDK 11 或 17 LTS        |
 | JMeter| 5.6     | 下载 [apache-jmeter](https://jmeter.apache.org/) |
 | Ant   | 1.10+   | `brew install ant` / `choco install ant` |
-| ant-jmeter | 1.1.1 | 复制 `ant-jmeter-1.1.1.jar` 到 `$JMETER_HOME/lib/ext/` |
 
 ## 快速开始
 
@@ -41,11 +40,7 @@ cp build.properties.sample build.properties
 export JMETER_HOME=/path/to/apache-jmeter-5.6
 ```
 
-### 2. 安装 ant-jmeter 插件
-
-从 https://github.com/jfifield/ant-jmeter 下载 `ant-jmeter-1.1.1.jar`，放入 `$JMETER_HOME/lib/ext/` 目录。
-
-### 3. 运行测试
+### 2. 运行测试
 
 ```bash
 # 运行所有测试 (默认目标)
@@ -55,7 +50,7 @@ ant
 ant test-only
 
 # 运行指定测试脚本
-ant -Djmx.pattern=HttpApiTest.jmx
+ant -Djmx.file=HttpApiTest.jmx
 
 # 参数化执行：自定义并发和循环次数
 ant -Dthreads=100 -Dloops=10 -Drampup=20
@@ -67,7 +62,7 @@ ant -Ddb.url=jdbc:mysql://localhost:3306/mydb -Ddb.username=test -Ddb.password=s
 ant clean-all
 ```
 
-### 4. 查看报告
+### 3. 查看报告
 
 测试完成后，HTML 报告生成在 `results/{timestamp}/TestReport-{timestamp}.html`。
 
@@ -91,7 +86,7 @@ ant clean-all
 ### 示例：数据库测试
 
 ```bash
-ant -Djmx.pattern=MySQLTest.jmx \
+ant -Djmx.file=MySQLTest.jmx \
     -Ddb.url=jdbc:mysql://localhost:3306/company \
     -Ddb.username=test \
     -Ddb.password=test123 \
@@ -102,7 +97,7 @@ ant -Djmx.pattern=MySQLTest.jmx \
 ### 示例：HTTP API 测试
 
 ```bash
-ant -Djmx.pattern=HttpApiTest.jmx \
+ant -Djmx.file=HttpApiTest.jmx \
     -Dapi.host=api.example.com \
     -Dapi.port=443 \
     -Dapi.protocol=https \

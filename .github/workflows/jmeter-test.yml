@@ -52,13 +52,9 @@ jobs:
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
 
-      - name: Install Ant + ant-jmeter
+      - name: Install Ant
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ant
-          # ant-jmeter 放入 JMeter lib/ext，build.xml 的 taskdef classpath 会在此查找
-          sudo mkdir -p /opt/apache-jmeter/lib/ext
-          sudo curl -sL "https://repo1.maven.org/maven2/org/programmerplanet/ant-jmeter/1.1.1/ant-jmeter-1.1.1.jar" \
-            -o /opt/apache-jmeter/lib/ext/ant-jmeter-1.1.1.jar
 
       - name: Create build.properties
         run: |
@@ -68,7 +64,7 @@ jobs:
 
       - name: Run HTTP API tests
         run: |
-          ant -Djmx.pattern=HttpApiTest.jmx \
+          ant -Djmx.file=HttpApiTest.jmx \
               -Dthreads=${{ github.event.inputs.threads || 10 }} \
               -Dloops=${{ github.event.inputs.loops || 1 }} \
               run
@@ -136,7 +132,7 @@ jobs:
             echo "JMETER_DB_PASSWORD 未配置，跳过 MySQL 测试"
             exit 0
           fi
-          ant -Djmx.pattern=MySQLTest.jmx \
+          ant -Djmx.file=MySQLTest.jmx \
               -Dthreads=${{ github.event.inputs.threads || 10 }} \
               -Dloops=${{ github.event.inputs.loops || 1 }} \
               -Ddb.url="${{ secrets.JMETER_DB_URL }}" \

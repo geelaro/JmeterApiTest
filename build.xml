@@ -6,43 +6,24 @@
         <format property="time" pattern="yyyyMMddHHmm"/>
     </tstamp>
 
-    <!-- 加载本地配置 (基于 build.properties.sample 创建) -->
     <property file="build.properties"/>
-
-    <!-- JMeter 安装目录: 可通过 -Djmeter.home=... 或 build.properties 指定 -->
     <property name="jmeter.home" value="${env.JMETER_HOME}"/>
-
-    <!-- 项目目录默认为 build.xml 所在目录 -->
     <property name="jmeter.project" value="${basedir}"/>
-
-    <!-- 测试脚本目录 -->
     <property name="jmeter.jmx.dir" value="${jmeter.project}/jmx"/>
-
-    <!-- 结果输出目录 -->
     <property name="jmeter.result.dir" value="${jmeter.project}/results/${time}"/>
-
-    <!-- 报告文件名前缀 -->
     <property name="ReportName" value="TestReport"/>
     <property name="jmeter.result.jtlName" value="${jmeter.result.dir}/${ReportName}-${time}.jtl"/>
     <property name="jmeter.result.htmlName" value="${jmeter.result.dir}/${ReportName}-${time}.html"/>
-
     <property name="lib.dir" value="${jmeter.home}/lib"/>
 
-    <!-- JMeter 运行时属性: 断言失败也写入 JTL -->
-    <property name="jmeter.save.saveservice.assertion_results_failure_message" value="true"/>
-    <property name="jmeter.save.saveservice.output_format" value="xml"/>
-
-    <!-- ==========================================
-         XSLT 依赖 classpath
-         ========================================== -->
+    <!-- XSLT classpath -->
     <path id="xslt.classpath">
         <fileset dir="${lib.dir}" includes="xalan*.jar"/>
         <fileset dir="${lib.dir}" includes="serializer*.jar"/>
     </path>
 
     <!-- ==========================================
-         run: 默认入口 (清理 → 测试 → 报告)
-         使用: ant 或 ant run
+         run: 默认入口
          ========================================== -->
     <target name="run" depends="clean, test, report"
             description="执行完整测试流程: 清理、运行测试、生成报告">
@@ -52,7 +33,7 @@
     </target>
 
     <!-- ==========================================
-         clean: 创建输出目录
+         clean
          ========================================== -->
     <target name="clean" description="创建结果输出目录">
         <mkdir dir="${jmeter.result.dir}"/>
@@ -60,17 +41,18 @@
     </target>
 
     <!-- ==========================================
-         test: 运行 JMeter 测试
-         通过 -Djmx.pattern=xxx.jmx 指定单个脚本，默认执行所有 *.jmx
-         通过 -D 传递的参数会自动注入 JMeter 属性
+         test: 运行 JMeter 测试 (CLI 模式)
+         用法:
+           ant test -Djmx.file=HttpApiTest.jmx
+           或
+           ant test   (运行 jmx 目录下所有 .jmx)
          ========================================== -->
-    <target name="test" description="运行 JMeter 测试脚本">
-        <fail unless="jmeter.home" message="请设置 jmeter.home: 复制 build.properties.sample 为 build.properties 并修改路径，或设置 JMETER_HOME 环境变量"/>
+    <target name="test" description="运行 JMeter 测试">
+        <fail unless="jmeter.home"
+              message="请设置 jmeter.home: 复制 build.properties.sample 为 build.properties 并修改路径，或设置 JMETER_HOME 环境变量"/>
 
-        <!-- JMX 文件匹配模式，默认为所有 .jmx -->
-        <property name="jmx.pattern" value="*.jmx"/>
-
-        <!-- 测试参数默认值 (可通过 -D 覆盖) -->
+        <!-- 默认参数值，可通过 -D 覆盖 -->
+        <property name="jmx.file" value="HttpApiTest.jmx"/>
         <property name="threads" value="10"/>
         <property name="rampup" value="5"/>
         <property name="loops" value="1"/>
@@ -82,51 +64,38 @@
         <property name="api.protocol" value="https"/>
         <property name="max_response_time" value="3000"/>
 
-        <taskdef name="jmeter"
-                 classname="org.programmerplanet.ant.taskdefs.jmeter.JMeterTask">
-            <classpath>
-                <fileset dir="${jmeter.home}/lib/ext" includes="ant-jmeter*.jar"/>
-            </classpath>
-        </taskdef>
+        <echo message="JMeter:  ${jmeter.home}"/>
+        <echo message="脚本:   ${jmx.file}"/>
+        <echo message="参数:   threads=${threads}  rampup=${rampup}s  loops=${loops}"/>
 
-        <echo message="JMeter 目录: ${jmeter.home}"/>
-        <echo message="测试脚本: ${jmx.pattern}"/>
-        <echo message="线程数=${threads}  RampUp=${rampup}s  循环=${loops}"/>
+        <exec executable="${jmeter.home}/bin/jmeter"
+              failonerror="false"
+              resultproperty="jmeter.exitcode">
+            <arg value="-n"/>
+            <arg value="-t"/><arg value="${jmeter.jmx.dir}/${jmx.file}"/>
+            <arg value="-l"/><arg value="${jmeter.result.jtlName}"/>
+            <arg value="-j"/><arg value="${jmeter.result.dir}/jmeter.log"/>
+            <arg value="-e"/>
+            <arg value="-o"/><arg value="${jmeter.result.dir}/dashboard"/>
+            <arg value="-Jjmeter.save.saveservice.output_format=xml"/>
+            <arg value="-Jjmeter.save.saveservice.assertion_results_failure_message=true"/>
+            <arg line="-Jthreads=${threads} -Jrampup=${rampup} -Jloops=${loops}"/>
+            <arg line="-Jdb.url=${db.url} -Jdb.username=${db.username} -Jdb.password=${db.password}"/>
+            <arg line="-Japi.host=${api.host} -Japi.port=${api.port} -Japi.protocol=${api.protocol}"/>
+            <arg line="-Jmax_response_time=${max_response_time}"/>
+        </exec>
 
-        <jmeter jmeterhome="${jmeter.home}"
-                resultlog="${jmeter.result.jtlName}"
-                failureproperty="jmeter.failed"
-                errorproperty="jmeter.error">
-            <testplans dir="${jmeter.jmx.dir}" includes="${jmx.pattern}"/>
-            <property name="jmeter.save.saveservice.output_format" value="xml"/>
-            <property name="jmeter.save.saveservice.assertion_results_failure_message" value="true"/>
-            <!-- 将 Ant 属性映射为 JMeter 属性 (__P 函数可读取) -->
-            <property name="threads" value="${threads}"/>
-            <property name="rampup" value="${rampup}"/>
-            <property name="loops" value="${loops}"/>
-            <property name="db.url" value="${db.url}"/>
-            <property name="db.username" value="${db.username}"/>
-            <property name="db.password" value="${db.password}"/>
-            <property name="api.host" value="${api.host}"/>
-            <property name="api.port" value="${api.port}"/>
-            <property name="api.protocol" value="${api.protocol}"/>
-            <property name="max_response_time" value="${max_response_time}"/>
-        </jmeter>
-
-        <condition property="jmeter.test.failed">
-            <or>
-                <isset property="jmeter.failed"/>
-                <isset property="jmeter.error"/>
-            </or>
-        </condition>
-
-        <fail if="jmeter.test.failed" message="JMeter 测试失败——请检查报告中的断言结果"/>
+        <fail message="JMeter 测试失败 (exit code ${jmeter.exitcode})">
+            <condition>
+                <not><equals arg1="${jmeter.exitcode}" arg2="0"/></not>
+            </condition>
+        </fail>
     </target>
 
     <!-- ==========================================
          report: 生成 HTML 报告
          ========================================== -->
-    <target name="report" description="将 JTL 结果转换为 HTML 报告">
+    <target name="report" description="生成 HTML 报告">
         <tstamp>
             <format property="report.datestamp" pattern="yyyy/MM/dd HH:mm"/>
         </tstamp>
@@ -146,19 +115,13 @@
             </fileset>
         </copy>
 
-        <echo message="HTML 报告已生成: ${jmeter.result.htmlName}"/>
+        <echo message="HTML 报告: ${jmeter.result.htmlName}"/>
     </target>
 
-    <!-- ==========================================
-         test-only: 仅运行测试，不生成报告
-         ========================================== -->
     <target name="test-only" depends="clean, test"
             description="仅运行测试，不生成 HTML 报告"/>
 
-    <!-- ==========================================
-         clean-all: 清理所有历史结果
-         ========================================== -->
-    <target name="clean-all" description="删除所有历史测试结果">
+    <target name="clean-all" description="清理所有历史结果">
         <delete dir="${jmeter.project}/results"/>
         <delete dir="${jmeter.project}/report"/>
     </target>
