@@ -26,7 +26,6 @@ on:
         default: '1'
 
 jobs:
-  # HTTP API 测试 —— 始终运行，无需外部凭证
   http-test:
     runs-on: ubuntu-latest
     steps:
@@ -53,8 +52,7 @@ jobs:
           rm /tmp/jmeter.tgz
 
       - name: Install Ant
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ant
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ant
 
       - name: Create build.properties
         run: |
@@ -69,13 +67,47 @@ jobs:
               -Dloops=${{ github.event.inputs.loops || 1 }} \
               run
 
+      - name: Generate job summary
+        if: always()
+        run: |
+          echo "## JMeter HTTP Test Results :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          JTL=$(ls results/**/*.jtl 2>/dev/null | head -1)
+          if [ -n "$JTL" ] && [ -s "$JTL" ]; then
+            # 提取 JTL 中的汇总数据 (xml 格式)
+            SAMPLES=$(grep -oP '(?<=<httpSample).*?(?=/>)' "$JTL" | wc -l || echo "0")
+            FAILURES=$(grep -oP '(?<=<httpSample).*?s="false".*?(?=/>)' "$JTL" | wc -l || echo "0")
+            AVG_TIME=$(grep -oP '(?<=t=")[0-9]+' "$JTL" | awk '{sum+=$1; count++} END {printf "%d", sum/count}' || echo "0")
+
+            echo "| Total Samples | ${SAMPLES} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Failures | ${FAILURES} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Avg Response (ms) | ${AVG_TIME} |" >> $GITHUB_STEP_SUMMARY
+
+            if [ "${FAILURES}" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo ":x: **${FAILURES} 个请求失败**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo ":white_check_mark: **全部通过**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "| Status | No results found |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # 链接到 HTML 报告 artifact
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> :arrow_down: 完整 HTML 报告见下方 **Artifacts**" >> $GITHUB_STEP_SUMMARY
+
       - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: http-test-report
           path: results/**/*.html
-          retention-days: 7
+          retention-days: 30
 
       - name: Upload JTL results
         if: always()
@@ -83,9 +115,8 @@ jobs:
         with:
           name: http-test-jtl
           path: results/**/*.jtl
-          retention-days: 7
+          retention-days: 30
 
-  # MySQL 数据库测试 —— 仅在配置了 Secrets 后运行
   mysql-test:
     runs-on: ubuntu-latest
     steps:
@@ -111,12 +142,8 @@ jobs:
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
 
-      - name: Install Ant + ant-jmeter
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ant
-          sudo mkdir -p /opt/apache-jmeter/lib/ext
-          sudo curl -sL "https://repo1.maven.org/maven2/org/programmerplanet/ant-jmeter/1.1.1/ant-jmeter-1.1.1.jar" \
-            -o /opt/apache-jmeter/lib/ext/ant-jmeter-1.1.1.jar
+      - name: Install Ant
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ant
 
       - name: Create build.properties
         run: |
@@ -129,7 +156,8 @@ jobs:
           DB_PASSWORD: ${{ secrets.JMETER_DB_PASSWORD }}
         run: |
           if [ -z "$DB_PASSWORD" ]; then
-            echo "JMETER_DB_PASSWORD 未配置，跳过 MySQL 测试"
+            echo "## MySQL Test :pause_button: Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "JMETER_DB_PASSWORD secret 未配置" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
           ant -Djmx.file=MySQLTest.jmx \
@@ -140,13 +168,28 @@ jobs:
               -Ddb.password="$DB_PASSWORD" \
               run
 
+      - name: Generate job summary
+        if: always()
+        run: |
+          JTL=$(ls results/**/*.jtl 2>/dev/null | head -1)
+          if [ -n "$JTL" ] && [ -s "$JTL" ]; then
+            echo "## JMeter MySQL Test Results :bar_chart:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            SAMPLES=$(grep -oP '(?<=<JDBCSampler).*?(?=/>)' "$JTL" | wc -l || echo "0")
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total JDBC Queries | ${SAMPLES} |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "> :arrow_down: 完整报告见下方 **Artifacts**" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mysql-test-report
           path: results/**/*.html
-          retention-days: 7
+          retention-days: 30
 
       - name: Upload JTL results
         if: always()
@@ -154,4 +197,4 @@ jobs:
         with:
           name: mysql-test-jtl
           path: results/**/*.jtl
-          retention-days: 7
+          retention-days: 30
