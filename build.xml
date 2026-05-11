@@ -75,8 +75,6 @@
             <arg value="-t"/><arg value="${jmeter.jmx.dir}/${jmx.file}"/>
             <arg value="-l"/><arg value="${jmeter.result.jtlName}"/>
             <arg value="-j"/><arg value="${jmeter.result.dir}/jmeter.log"/>
-            <arg value="-e"/>
-            <arg value="-o"/><arg value="${jmeter.result.dir}/dashboard"/>
             <arg value="-Jjmeter.save.saveservice.output_format=xml"/>
             <arg value="-Jjmeter.save.saveservice.assertion_results_failure_message=true"/>
             <arg line="-Jthreads=${threads} -Jrampup=${rampup} -Jloops=${loops}"/>
