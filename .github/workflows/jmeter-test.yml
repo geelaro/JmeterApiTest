@@ -43,8 +43,16 @@ jobs:
 
       - name: Download JMeter
         if: steps.cache-jmeter.outputs.cache-hit != 'true'
+        timeout-minutes: 5
         run: |
-          curl -sL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz" -o /tmp/jmeter.tgz
+          for i in 1 2 3; do
+            curl -fSL --connect-timeout 30 --retry 3 --progress-bar \
+              "https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz" \
+              -o /tmp/jmeter.tgz && break
+            echo "下载失败，重试 $i/3..."
+            sleep 5
+          done
+          test -s /tmp/jmeter.tgz || { echo "JMeter 下载失败"; exit 1; }
           sudo mkdir -p /opt/apache-jmeter
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
@@ -116,8 +124,16 @@ jobs:
 
       - name: Download JMeter
         if: steps.cache-jmeter.outputs.cache-hit != 'true'
+        timeout-minutes: 5
         run: |
-          curl -sL "https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-5.6.3.tgz" -o /tmp/jmeter.tgz
+          for i in 1 2 3; do
+            curl -fSL --connect-timeout 30 --retry 3 --progress-bar \
+              "https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz" \
+              -o /tmp/jmeter.tgz && break
+            echo "下载失败，重试 $i/3..."
+            sleep 5
+          done
+          test -s /tmp/jmeter.tgz || { echo "JMeter 下载失败"; exit 1; }
           sudo mkdir -p /opt/apache-jmeter
           sudo tar xzf /tmp/jmeter.tgz -C /opt/apache-jmeter --strip-components=1
           rm /tmp/jmeter.tgz
