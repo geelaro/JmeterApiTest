@@ -92,8 +92,6 @@ jobs:
   # MySQL 数据库测试 —— 仅在配置了 Secrets 后运行
   mysql-test:
     runs-on: ubuntu-latest
-    # 只有配置了数据库密码 secret 才运行
-    if: ${{ secrets.JMETER_DB_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -131,13 +129,19 @@ jobs:
           EOF
 
       - name: Run MySQL tests
+        env:
+          DB_PASSWORD: ${{ secrets.JMETER_DB_PASSWORD }}
         run: |
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "JMETER_DB_PASSWORD 未配置，跳过 MySQL 测试"
+            exit 0
+          fi
           ant -Djmx.pattern=MySQLTest.jmx \
               -Dthreads=${{ github.event.inputs.threads || 10 }} \
               -Dloops=${{ github.event.inputs.loops || 1 }} \
               -Ddb.url="${{ secrets.JMETER_DB_URL }}" \
               -Ddb.username="${{ secrets.JMETER_DB_USERNAME }}" \
-              -Ddb.password="${{ secrets.JMETER_DB_PASSWORD }}" \
+              -Ddb.password="$DB_PASSWORD" \
               run
 
       - name: Upload HTML report
