@@ -21,6 +21,15 @@ if "%LOOPS%"=="" set LOOPS=1
 set RAMPUP=%4
 if "%RAMPUP%"=="" set RAMPUP=5
 
+REM 可选参数: 数据库 / API (从环境变量读取)
+if "%DB_URL%"==""        set DB_URL=
+if "%DB_USERNAME%"==""   set DB_USERNAME=
+if "%DB_PASSWORD%"==""   set DB_PASSWORD=
+if "%API_HOST%"==""      set API_HOST=httpbin.org
+if "%API_PORT%"==""      set API_PORT=443
+if "%API_PROTOCOL%"==""  set API_PROTOCOL=https
+if "%MAX_RESPONSE_TIME%"=="" set MAX_RESPONSE_TIME=3000
+
 REM JMETER_HOME: 环境变量 > jmeter.env 文件
 if "%JMETER_HOME%"=="" (
     if exist "%SCRIPT_DIR%jmeter.env" (
@@ -65,10 +74,22 @@ call "%JMETER%" -n ^
     -Jthreads=%THREADS% ^
     -Jrampup=%RAMPUP% ^
     -Jloops=%LOOPS% ^
-    -Japi.host=httpbin.org ^
-    -Japi.port=443 ^
-    -Japi.protocol=https ^
-    -Jmax_response_time=3000
+    -Jdb.url=%DB_URL% ^
+    -Jdb.username=%DB_USERNAME% ^
+    -Jdb.password=%DB_PASSWORD% ^
+    -Japi.host=%API_HOST% ^
+    -Japi.port=%API_PORT% ^
+    -Japi.protocol=%API_PROTOCOL% ^
+    -Jmax_response_time=%MAX_RESPONSE_TIME%
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ==========================================
+    echo  测试失败! (exit code: %ERRORLEVEL%)
+    echo  日志: %RESULT_DIR%\jmeter.log
+    echo ==========================================
+    exit /b %ERRORLEVEL%
+)
 
 echo.
 echo ==========================================
