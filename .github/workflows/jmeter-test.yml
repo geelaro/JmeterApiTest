@@ -47,7 +47,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             curl -fSL --connect-timeout 30 --retry 3 --progress-bar \
-              "https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz" \
+              "https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-5.6.3.tgz" \
               -o /tmp/jmeter.tgz && break
             echo "下载失败，重试 $i/3..."
             sleep 5
@@ -128,7 +128,7 @@ jobs:
         run: |
           for i in 1 2 3; do
             curl -fSL --connect-timeout 30 --retry 3 --progress-bar \
-              "https://dlcdn.apache.org//jmeter/binaries/apache-jmeter-5.6.3.tgz" \
+              "https://dlcdn.apache.org/jmeter/binaries/apache-jmeter-5.6.3.tgz" \
               -o /tmp/jmeter.tgz && break
             echo "下载失败，重试 $i/3..."
             sleep 5
